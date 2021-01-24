@@ -3,9 +3,11 @@ import os
 from PIL import Image
 from flask import  request, render_template, url_for,redirect, flash, redirect
 from DebugApp import app, db, bcrypt
-from DebugApp.forms import LoginForm, RegistrationForm, UpdateAccountForm
-from DebugApp.models import User
+from DebugApp.forms import LoginForm, RegistrationForm, UpdateAccountForm, TicketForm
+from DebugApp.models import User, Ticket
 from flask_login import login_user, current_user, logout_user, login_required
+
+
 
 @app.route("/")
 @app.route("/home")
@@ -16,6 +18,12 @@ def home():
 @app.route("/about")
 def about():
     return render_template('about.html', title='About')
+
+
+@app.route("/dashboard")
+def dashboard():
+    ticket = Ticket.query.all()
+    return render_template('dashboard.html')
 
 
 @app.route("/register", methods=['GET', 'POST'])
@@ -43,7 +51,7 @@ def login():
         if user and bcrypt.check_password_hash(user.password, form.password.data):
             login_user(user, remember=form.remember.data)
             next_page= request.args.get('next')
-            return redirect(next_page if next_page else url_for('account'))
+            return redirect(next_page if next_page else url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password', 'danger')
     return render_template('login.html', title='Login', form=form)
@@ -87,3 +95,22 @@ def account():
     image_file = url_for('static', filename='profile_pics/' + current_user.image_file)
     return render_template('account.html', title='Account',
                            image_file=image_file, form=form)
+
+
+
+@app.route("/ticket/new", methods=['GET','POST'])
+@login_required
+def new_ticket():
+    from = TicketForm()
+    ticket = Ticket(title=form.title.data, content=form.content.data, author=current_user)
+    db.session.add(ticket)
+    db.session.commit()
+    if form.validate_on_submit():
+        flash('Yout ticket has been created!', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('create_ticket.html', title='New Ticket', form=form)
+
+@app.route("/ticket/<int:ticket_id>")
+def ticket(ticket_id):
+    ticket=Ticket.query.get_or_404(post_id)
+    return render_template('ticket.html', title=ticket.title, ticket=ticket)
