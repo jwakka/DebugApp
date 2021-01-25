@@ -1,7 +1,7 @@
 import secrets
 import os
 from PIL import Image
-from flask import  request, render_template, url_for,redirect, flash, redirect
+from flask import  request, render_template, url_for,redirect, flash, redirect, abort
 from DebugApp import app, db, bcrypt
 from DebugApp.forms import LoginForm, RegistrationForm, UpdateAccountForm, TicketForm
 from DebugApp.models import User, Ticket
@@ -22,14 +22,14 @@ def about():
 
 @app.route("/dashboard")
 def dashboard():
-    ticket = Ticket.query.all()
-    return render_template('dashboard.html')
+    tickets = Ticket.query.all()
+    return render_template('dashboard.html', tickets=tickets)
 
 
 @app.route("/register", methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('home'))
+        return redirect(url_for('dashboard'))
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
@@ -44,7 +44,7 @@ def register():
 @app.route("/login", methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('home'))
+        return redirect(url_for('dashboard'))
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email= form.email.data).first()
@@ -98,19 +98,50 @@ def account():
 
 
 
-@app.route("/ticket/new", methods=['GET','POST'])
+@app.route("/ticket/new", methods=['GET', 'POST'])
 @login_required
 def new_ticket():
-    from = TicketForm()
-    ticket = Ticket(title=form.title.data, content=form.content.data, author=current_user)
-    db.session.add(ticket)
-    db.session.commit()
+    form = TicketForm()
     if form.validate_on_submit():
-        flash('Yout ticket has been created!', 'success')
+        ticket = Ticket(title=form.title.data, content=form.content.data, author=current_user)
+        db.session.add(ticket)
+        db.session.commit()
+        flash('Your ticket has been created!', 'success')
         return redirect(url_for('dashboard'))
-    return render_template('create_ticket.html', title='New Ticket', form=form)
+    return render_template('create_ticket.html', title='New Ticket',
+                           form=form, legend='New Ticket')
 
-@app.route("/ticket/<int:ticket_id>")
+@app.route('/ticket/<int:ticket_id>')
 def ticket(ticket_id):
-    ticket=Ticket.query.get_or_404(post_id)
+    ticket = Ticket.query.get_or_404(ticket_id)
     return render_template('ticket.html', title=ticket.title, ticket=ticket)
+
+@app.route("/ticket/<int:ticket_id>/update", methods=['GET', 'POST'])
+@login_required
+def update_ticket(ticket_id):
+    ticket = Ticket.query.get_or_404(ticket_id)
+    if ticket.author != current_user:
+        abort(403)
+    form = TicketForm()
+    if form.validate_on_submit():
+        ticket.title = form.title.data
+        ticket.content = form.content.data
+        db.session.commit()
+        flash('Your ticket has been updated!', 'success')
+        return redirect(url_for('ticket', ticket_id=ticket.id))
+    elif request.method == 'GET':
+        form.title.data = ticket.title
+        form.content.data = ticket.content
+    return render_template('create_ticket.html', title='Update Ticket',
+                           form=form, legend='Update Ticket')
+
+@app.route("/ticket/<int:ticket_id>/delete", methods=['POST'])
+@login_required
+def delete_ticket(ticket_id):
+    ticket = Ticket.query.get_or_404(ticket_id)
+    if ticket.author != current_user:
+        abort(403)
+    db.session.delete(ticket)
+    db.session.commit()
+    flash('Your ticket has been deleted!', 'success')
+    return redirect(url_for('dashboard'))

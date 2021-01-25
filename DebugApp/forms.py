@@ -60,6 +60,6 @@ class UpdateAccountForm(FlaskForm):
 class TicketForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
     content = TextAreaField('Content', validators=[DataRequired()])
-    submit = SubmitField('Ticket')
+    submit = SubmitField('Submit')
 
 
